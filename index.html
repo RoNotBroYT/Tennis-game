@@ -1,129 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Fun Tennis Game</title> 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>Top-Down Tennis</title>
   <style>
-    body { margin: 0; background: #60c07b; overflow: hidden; }
-    canvas { display: block; margin: 0 auto; background: #2ecc71; }
+    body { margin: 0; background: #4caf50; overflow: hidden; }
+    canvas { display: block; margin: 0 auto; background: #1e7c33; }
   </style>
 </head>
 <body>
 <canvas id="game" width="800" height="500"></canvas>
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
 const court = {
-  netHeight: 6,
-  baselineOffset: 30,
-  serviceBoxHeight: 80
+  left: 100, right: 700, top: 50, bottom: 450,
+  netY: 250
 };
 
-const playerSize = { width: 10, height: 40 };
+const playerSize = 20;
 const ballSize = 8;
 
-let player1 = { x: 100, y: 400, vy: 0 };
-let player2 = { x: 700, y: 100, vy: 0 }; 
+let player1 = { x: 400, y: 400 };
+let player2 = { x: 400, y: 100 }; // AI
 
-let ball = {
-  x: 400,
-  y: 250,
-  vx: 5,
-  vy: -3
-};
+let ball = { x: 400, y: 250, vx: 3, vy: 3 };
 
 let keys = {};
-
-document.addEventListener('keydown', (e) => keys[e.key] = true);
-document.addEventListener('keyup', (e) => keys[e.key] = false);
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
 
 function drawCourt() {
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = "#fff";
+  ctx.lineWidth = 2;
 
-  ctx.fillRect(0, court.baselineOffset, canvas.width, 2);
-  ctx.fillRect(0, canvas.height - court.baselineOffset, canvas.width, 2);
+  // Outer boundaries
+  ctx.strokeRect(court.left, court.top, court.right - court.left, court.bottom - court.top);
 
-  ctx.fillRect(canvas.width / 2 - 1, 0, 2, canvas.height);
+  // Net
+  ctx.beginPath();
+  ctx.moveTo(court.left, court.netY);
+  ctx.lineTo(court.right, court.netY);
+  ctx.stroke();
 
-  ctx.fillRect(0, canvas.height / 2 - court.serviceBoxHeight, canvas.width, 2);
-  ctx.fillRect(0, canvas.height / 2 + court.serviceBoxHeight, canvas.width, 2);
-
-  ctx.fillRect(50, 0, 2, canvas.height);
-  ctx.fillRect(canvas.width - 50, 0, 2, canvas.height);
+  // Service boxes
+  ctx.beginPath();
+  ctx.moveTo((court.left + court.right) / 2, court.top);
+  ctx.lineTo((court.left + court.right) / 2, court.bottom);
+  ctx.stroke();
 }
 
 function drawPlayers() {
-  ctx.fillStyle = '#34495e';
-  ctx.fillRect(player1.x - playerSize.width / 2, player1.y - playerSize.height, playerSize.width, playerSize.height);
-  ctx.fillRect(player2.x - playerSize.width / 2, player2.y, playerSize.width, playerSize.height);
+  ctx.fillStyle = "blue";
+  ctx.beginPath();
+  ctx.arc(player1.x, player1.y, playerSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "red";
+  ctx.beginPath();
+  ctx.arc(player2.x, player2.y, playerSize, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawBall() {
-  ctx.fillStyle = '#f1c40f';
+  ctx.fillStyle = "yellow";
   ctx.beginPath();
   ctx.arc(ball.x, ball.y, ballSize, 0, Math.PI * 2);
   ctx.fill();
 }
 
 function movePlayers() {
-  if (keys["a"]) player1.x -= 5;
-  if (keys["d"]) player1.x += 5;
-  player1.x = Math.max(50, Math.min(canvas.width - 50, player1.x));
+  const speed = 4;
+  if (keys["a"]) player1.x -= speed;
+  if (keys["d"]) player1.x += speed;
+  if (keys["w"]) player1.y -= speed;
+  if (keys["s"]) player1.y += speed;
 
-  
-  if (ball.vy < 0) { 
-    if (ball.x < player2.x - 5) player2.x -= 3;
-    else if (ball.x > player2.x + 5) player2.x += 3;
+  // Keep player on bottom half
+  player1.x = Math.max(court.left, Math.min(court.right, player1.x));
+  player1.y = Math.max(court.netY + playerSize, Math.min(court.bottom, player1.y));
+
+  // AI movement
+  if (ball.vy < 0 && ball.y < court.netY) {
+    if (ball.x < player2.x - 5) player2.x -= 2;
+    else if (ball.x > player2.x + 5) player2.x += 2;
   }
-
-  player2.x = Math.max(50, Math.min(canvas.width - 50, player2.x));
+  player2.x = Math.max(court.left, Math.min(court.right, player2.x));
 }
 
 function moveBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
 
-  if (ball.x < 50 + ballSize || ball.x > canvas.width - 50 - ballSize) {
+  if (ball.x < court.left + ballSize || ball.x > court.right - ballSize) {
     ball.vx *= -1;
   }
 
-  if (ball.y < court.baselineOffset + ballSize || ball.y > canvas.height - court.baselineOffset - ballSize) {
+  // Bounce off top/bottom (simulate bounce)
+  if (ball.y < court.top + ballSize || ball.y > court.bottom - ballSize) {
     ball.vy *= -1;
   }
 
-  let p1Top = player1.y - playerSize.height;
-  if (ball.y + ballSize >= p1Top &&
-      ball.y + ballSize <= player1.y &&
-      Math.abs(ball.x - player1.x) < playerSize.width) {
+  // Bounce off players
+  let dx1 = ball.x - player1.x;
+  let dy1 = ball.y - player1.y;
+  if (Math.hypot(dx1, dy1) < playerSize + ballSize && ball.vy > 0) {
     ball.vy *= -1;
-    ball.y = p1Top - ballSize;
+    ball.y = player1.y - playerSize - ballSize;
   }
 
-  let p2Bottom = player2.y + playerSize.height;
-  if (ball.y - ballSize <= p2Bottom &&
-      ball.y - ballSize >= player2.y &&
-      Math.abs(ball.x - player2.x) < playerSize.width) {
+  let dx2 = ball.x - player2.x;
+  let dy2 = ball.y - player2.y;
+  if (Math.hypot(dx2, dy2) < playerSize + ballSize && ball.vy < 0) {
     ball.vy *= -1;
-    ball.y = p2Bottom + ballSize;
+    ball.y = player2.y + playerSize + ballSize;
   }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawCourt();
-  drawPlayers();
-  drawBall();
 }
 
 function update() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawCourt();
   movePlayers();
   moveBall();
-  draw();
+  drawPlayers();
+  drawBall();
   requestAnimationFrame(update);
 }
-
 update();
 </script>
 </body>
