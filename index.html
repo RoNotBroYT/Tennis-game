@@ -1,129 +1,335 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Side View Tennis</title>
-  <style>
-    body { margin: 0; background: #87ceeb; }
-    canvas { display: block; margin: 0 auto; background: #4caf50; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fun Tennis Game</title>
+<style>
+  body {
+    margin: 0;
+    background: #4caf50;
+    overflow: hidden;
+    touch-action: none; 
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background: #1e7c33;
+    border: 2px solid #fff;
+  }
+  #scoreboard {
+    font-family: Arial, sans-serif;
+    color: white;
+    text-align: center;
+    margin: 10px;
+    font-size: 24px;
+    user-select: none;
+  }
+</style>
 </head>
 <body>
-<canvas id="game" width="800" height="400"></canvas>
+
+<div id="scoreboard">
+  Player 1: 0 &nbsp;&nbsp;|&nbsp;&nbsp; Player 2: 0 &nbsp;&nbsp;|&nbsp;&nbsp; Games: 0 - 0
+</div>
+
+<canvas id="game" width="800" height="500"></canvas>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const GRAVITY = 0.4;
-const GROUND_Y = 350;
-const NET_X = 400;
-const PLAYER_WIDTH = 20;
-const PLAYER_HEIGHT = 50;
-const BALL_RADIUS = 8;
-
-// Player 1 (You)
-let player1 = {
-  x: 100,
-  y: GROUND_Y - PLAYER_HEIGHT,
-  vx: 0,
-  vy: 0,
-  onGround: true
+const court = {
+  left: 100, right: 700, top: 50, bottom: 450,
+  netY: 250
 };
 
-// Player 2 (AI)
-let player2 = {
-  x: 700,
-  y: GROUND_Y - PLAYER_HEIGHT,
-  vx: 0,
-  vy: 0,
-  onGround: true
-};
+const playerSize = 20;
+const ballSize = 8;
 
-let ball = {
-  x: 200,
-  y: 300,
-  vx: 4,
-  vy: -6
-};
+let player1 = { x: 400, y: 400, score: 0, games: 0 };
+let player2 = { x: 400, y: 100, score: 0, games: 0 }; 
+
+let ball = { x: 400, y: 250, vx: 0, vy: 0, trail: [] };
 
 let keys = {};
-document.addEventListener("keydown", e => keys[e.key] = true);
-document.addEventListener("keyup", e => keys[e.key] = false);
+
+const scoreboard = document.getElementById("scoreboard");
+
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+// Touch controls
+let touchId = null;
+canvas.addEventListener("touchstart", e => {
+  if (touchId === null) {
+    const touch = e.changedTouches[0];
+    touchId = touch.identifier;
+    movePlayerToTouch(touch.clientX, touch.clientY);
+  }
+});
+canvas.addEventListener("touchmove", e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchId) {
+      movePlayerToTouch(touch.clientX, touch.clientY);
+      e.preventDefault();
+    }
+  }
+});
+canvas.addEventListener("touchend", e => {
+  for (const touch of e.changedTouches) {
+    if (touch.identifier === touchId) {
+      touchId = null;
+    }
+  }
+});
+
+function movePlayerToTouch(touchX, touchY) {
+  const rect = canvas.getBoundingClientRect();
+  let x = touchX - rect.left;
+  let y = touchY - rect.top;
+  
+  player1.x = Math.min(court.right, Math.max(court.left, x));
+  player1.y = Math.min(court.bottom, Math.max(court.netY + playerSize, y));
+}
 
 function drawCourt() {
   ctx.fillStyle = "#fff";
-  ctx.fillRect(0, GROUND_Y, canvas.width, 3); // ground
-  ctx.fillRect(NET_X - 2, GROUND_Y - 40, 4, 40); // net
+  ctx.lineWidth = 2;
+
+  
+  ctx.strokeRect(court.left, court.top, court.right - court.left, court.bottom - court.top);
+
+  
+  ctx.beginPath();
+  ctx.moveTo(court.left, court.netY);
+  ctx.lineTo(court.right, court.netY);
+  ctx.stroke();
+
+  
+  ctx.beginPath();
+  ctx.moveTo((court.left + court.right) / 2, court.top);
+  ctx.lineTo((court.left + court.right) / 2, court.bottom);
+  ctx.stroke();
 }
 
 function drawPlayers() {
+ 
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(player1.x, player1.y + 12, playerSize * 0.9, playerSize * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(player2.x, player2.y + 12, playerSize * 0.9, playerSize * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  
   ctx.fillStyle = "blue";
-  ctx.fillRect(player1.x, player1.y, PLAYER_WIDTH, PLAYER_HEIGHT);
+  ctx.beginPath();
+  ctx.arc(player1.x, player1.y, playerSize, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.fillStyle = "red";
-  ctx.fillRect(player2.x, player2.y, PLAYER_WIDTH, PLAYER_HEIGHT);
-}
-
-function drawBall() {
-  ctx.fillStyle = "yellow";
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+  ctx.arc(player2.x, player2.y, playerSize, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function movePlayer(player, control = true) {
-  const speed = 4;
-  if (control) {
-    if (keys["a"]) player.vx = -speed;
-    else if (keys["d"]) player.vx = speed;
-    else player.vx = 0;
+function drawBall() {
+ 
+  ctx.fillStyle = "rgba(255, 223, 0, 0.4)";
+  ball.trail.forEach(({x, y}, i) => {
+    ctx.beginPath();
+    ctx.arc(x, y, ballSize * (i / ball.trail.length), 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-    if (keys["w"] && player.onGround) {
-      player.vy = -10;
-      player.onGround = false;
-    }
-  }
-
-  player.x += player.vx;
-  player.y += player.vy;
-  player.vy += GRAVITY;
-
-  if (player.y >= GROUND_Y - PLAYER_HEIGHT) {
-    player.y = GROUND_Y - PLAYER_HEIGHT;
-    player.vy = 0;
-    player.onGround = true;
-  }
-
-  // Boundaries
-  if (control) {
-    player.x = Math.max(0, Math.min(NET_X - PLAYER_WIDTH, player.x)); // can't cross net
-  } else {
-    player.x = Math.max(NET_X + 2, Math.min(canvas.width - PLAYER_WIDTH, player.x));
-  }
+  ctx.fillStyle = "yellow";
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ballSize, 0, Math.PI * 2);
+  ctx.fill();
 }
+
+function updateBallTrail() {
+  ball.trail.unshift({x: ball.x, y: ball.y});
+  if (ball.trail.length > 10) ball.trail.pop();
+}
+
+function movePlayers() {
+  const speed = 5;
+  if (keys["a"]) player1.x -= speed;
+  if (keys["d"]) player1.x += speed;
+  if (keys["w"]) player1.y -= speed;
+  if (keys["s"]) player1.y += speed;
+
+ 
+  player1.x = Math.min(court.right, Math.max(court.left, player1.x));
+  player1.y = Math.min(court.bottom, Math.max(court.netY + playerSize, player1.y));
+
+ 
+  const difficulty = 0.03; 
+  let targetX = ball.x + ball.vx * 15; 
+  if (Math.random() < 0.01) targetX += (Math.random() - 0.5) * 100; 
+  if (ball.vy < 0 && ball.y < court.netY) {
+    if (player2.x < targetX - 5) player2.x += 3;
+    else if (player2.x > targetX + 5) player2.x -= 3;
+  }
+
+  
+  player2.x = Math.min(court.right, Math.max(court.left, player2.x));
+  player2.y = court.netY - playerSize; 
+}
+
+
+let shotPower = 1;
+let shotCooldown = 0;
 
 function moveBall() {
   ball.x += ball.vx;
   ball.y += ball.vy;
-  ball.vy += GRAVITY;
 
-  // Bounce off ground
-  if (ball.y + BALL_RADIUS >= GROUND_Y) {
-    ball.y = GROUND_Y - BALL_RADIUS;
-    ball.vy *= -0.9;
+  
+  if (ball.x < court.left + ballSize) {
+    ball.x = court.left + ballSize;
+    ball.vx *= -1;
   }
-
-  // Bounce off left/right
-  if (ball.x < 0 || ball.x > canvas.width) {
+  if (ball.x > court.right - ballSize) {
+    ball.x = court.right - ballSize;
     ball.vx *= -1;
   }
 
-  // Bounce off net
+
+  if (ball.y < court.top + ballSize) {
+    
+    scorePoint(player1, player2);
+  }
+  if (ball.y > court.bottom - ballSize) {
+    
+    scorePoint(player2, player1);
+  }
+
+
   if (
-    ball.x + BALL_RADIUS > NET_X - 2 &&
-    ball.x - BALL_RADIUS < NET_X + 2 &&
-    ball.y + BALL_RADIUS > GROUND_Y - 40
+    ball.y > court.netY - 5 && ball.y < court.netY + 5 &&
+    ball.x > court.left && ball.x < court.right
   ) {
-    ball.vx *= -1;
-    ball.x = ball.x < NET_X ? NET_X - BALL_RADIUS - 2 : NET_X + BALL_RADIUS + 2;
+    
+    if (
+      (ball.vy < 0 && ball.y > court.netY) || 
+      (ball.vy > 0 && ball.y < court.netY)    
+    ) {
+      ball.vy *= -1;
+    }
   }
+
+
+  function hitPlayer(p) {
+    const dx = ball.x - p.x;
+    const dy = ball.y - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < playerSize + ballSize && shotCooldown <= 0) {
+      
+      ball.vy = p === player1 ? -5 * shotPower : 5 * shotPower;
+      ball.vx = dx * 0.3 * shotPower;
+
+      
+      if (shotPower > 1.5) {
+        
+        ball.vx *= 1.5;
+        ball.vy *= 1.7;
+      } else if (shotPower < 0.8) {
+       
+        ball.vy *= 0.6;
+        ball.vx *= 0.5;
+      }
+
+      shotCooldown = 15;
+      return true;
+    }
+    return false;
+  }
+
+  if (hitPlayer(player1) || hitPlayer(player2)) {
+    shotPower = 1; 
+  } else if (shotCooldown > 0) {
+    shotCooldown--;
+  }
+}
+
+function scorePoint(scoringPlayer, otherPlayer) {
+  scoringPlayer.score++;
+  resetPositions();
+
+
+  if (scoringPlayer.score >= 4 && scoringPlayer.score - otherPlayer.score >= 2) {
+    scoringPlayer.games++;
+    scoringPlayer.score = 0;
+    otherPlayer.score = 0;
+  }
+
+  updateScoreboard();
+}
+
+function resetPositions() {
+  
+  player1.x = 400;
+  player1.y = 400;
+  player2.x = 400;
+  player2.y = court.netY - playerSize;
+
+ 
+  ball.x = 400;
+  ball.y = 250;
+  ball.vx = 0;
+  ball.vy = 3 * (Math.random() > 0.5 ? 1 : -1);
+  ball.trail = [];
+}
+
+function updateScoreboard() {
+  scoreboard.textContent = `Player 1: ${player1.score}  |  Player 2: ${player2.score}  |  Games: ${player1.games} - ${player2.games}`;
+}
+
+
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    shotPower = Math.min(2, shotPower + 0.02);
+  }
+});
+document.addEventListener("keyup", e => {
+  if (e.code === "Space") {
+    shotPower = 1;
+  }
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawCourt();
+  drawPlayers();
+  drawBall();
+  updateBallTrail();
+
+ 
+  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+  ctx.fillRect(20, 20, 150, 20);
+  ctx.fillStyle = "orange";
+  ctx.fillRect(20, 20, 150 * (shotPower / 2), 20);
+  ctx.strokeStyle = "#fff";
+  ctx.strokeRect(20, 20, 150, 20);
+
+  requestAnimationFrame(gameLoop);
+}
+
+function gameLoop() {
+  movePlayers();
+  moveBall();
+  draw();
+}
+
+resetPositions();
+updateScoreboard();
+requestAnimationFrame(gameLoop);
+</script>
+
+</body>
+</html>
