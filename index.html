@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fun tennis game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #2ecc71;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 10px auto;
+      background: #fff;
+      border: 6px solid #34495e;
+      box-shadow: 0 0 20px #0006;
+    }
+    #mode, .touch-controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .touch-controls {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .control-button {
+      width: 60px;
+      height: 60px;
+      background: #34495e;
+      color: #fff;
+      font-size: 24px;
+      border: none;
+      border-radius: 8px;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div id="mode">
+    <button onclick="setMode('single')">Single Player</button>
+    <button onclick="setMode('two')">Two Player</button>
+  </div>
+
+  <div class="touch-controls">
+    <div class="control-group">
+      <button class="control-button" ontouchstart="leftUp=true" ontouchend="leftUp=false">▲</button>
+      <button class="control-button" ontouchstart="leftDown=true" ontouchend="leftDown=false">▼</button>
+    </div>
+    <div class="control-group">
+      <button class="control-button" ontouchstart="rightUp=true" ontouchend="rightUp=false">▲</button>
+      <button class="control-button" ontouchstart="rightDown=true" ontouchend="rightDown=false">▼</button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let mode = "single";
+    function setMode(m) { mode = m; }
+
+    const paddleWidth = 10, paddleHeight = 100, ballSize = 10;
+    let leftY = canvas.height / 2 - paddleHeight / 2;
+    let rightY = canvas.height / 2 - paddleHeight / 2;
+    let ballX = canvas.width / 2;
+    let ballY = canvas.height / 2;
+    let ballSpeedX = 5, ballSpeedY = 3;
+    let leftScore = 0, rightScore = 0;
+    let keys = {};
+    let leftUp = false, leftDown = false;
+    let rightUp = false, rightDown = false;
+
+    document.addEventListener("keydown", e => keys[e.key] = true);
+    document.addEventListener("keyup", e => keys[e.key] = false);
+
+    function resetBall() {
+      ballX = canvas.width / 2;
+      ballY = canvas.height / 2;
+      ballSpeedX = -ballSpeedX;
+      ballSpeedY = (Math.random() * 4 - 2);
+    }
+
+    function movePaddles() {
+      if (keys["w"] || leftUp) leftY -= 6;
+      if (keys["s"] || leftDown) leftY += 6;
+
+      if (mode === "two") {
+        if (keys["ArrowUp"] || rightUp) rightY -= 6;
+        if (keys["ArrowDown"] || rightDown) rightY += 6;
+      } else {
+        let center = rightY + paddleHeight / 2;
+        if (center < ballY - 10) rightY += 4;
+        else if (center > ballY + 10) rightY -= 4;
+      }
+
+      leftY = Math.max(0, Math.min(canvas.height - paddleHeight, leftY));
+      rightY = Math.max(0, Math.min(canvas.height - paddleHeight, rightY));
+    }
+
+    function moveBall() {
+      ballX += ballSpeedX;
+      ballY += ballSpeedY;
+
+      if (ballY <= 0 || ballY >= canvas.height - ballSize) {
+        ballSpeedY = -ballSpeedY;
+      }
+
+      if (ballX <= paddleWidth &&
+          ballY + ballSize >= leftY &&
+          ballY <= leftY + paddleHeight) {
+        ballSpeedX = -ballSpeedX;
+      }
+
+      if (ballX + ballSize >= canvas.width - paddleWidth &&
+          ballY + ballSize >= rightY &&
+          ballY <= rightY + paddleHeight) {
+        ballSpeedX = -ballSpeedX;
+      }
+
+      if (ballX < 0) {
+        rightScore++;
+        resetBall();
+      }
+      if (ballX > canvas.width) {
+        leftScore++;
+        resetBall();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#2c3e50";
+      ctx.fillRect(0, leftY, paddleWidth, paddleHeight);
+      ctx.fillRect(canvas.width - paddleWidth, rightY, paddleWidth, paddleHeight);
+
+      ctx.fillStyle = "#e74c3c";
+      ctx.fillRect(ballX, ballY, ballSize, ballSize);
+
+      ctx.strokeStyle = "#bbb";
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2, 0);
+      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#000";
+      ctx.font = "32px Arial";
+      ctx.fillText(leftScore, canvas.width / 4, 40);
+      ctx.fillText(rightScore, canvas.width * 3/4, 40);
+    }
+
+    function loop() {
+      movePaddles();
+      moveBall();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
